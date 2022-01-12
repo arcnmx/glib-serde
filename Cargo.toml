@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-glib-serde-derive = { path = "glib-serde-derive" }
+glib-serde-derive = { path = "glib-serde-derive", optional = true }
 glib = { git = "https://github.com/gtk-rs/gtk-rs-core" }
 serde = "1"
 
@@ -12,6 +12,10 @@ serde = "1"
 gio = { git = "https://github.com/gtk-rs/gtk-rs-core" }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+
+[features]
+default = ["derive"]
+derive = ["glib-serde-derive"]
 
 [workspace]
 members = ["glib-serde-derive"]

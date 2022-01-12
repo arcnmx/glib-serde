@@ -9,7 +9,8 @@
 //! Serializing structs and enums requires an implementation of `VariantType`, which should be
 //! automatically derived:
 //!
-//! ```
+#![cfg_attr(feature = "derive", doc = "```")]
+#![cfg_attr(not(feature = "derive"), doc = "```ignore")]
 //! #[derive(Debug, PartialEq, Eq)]
 //! #[derive(glib_serde::VariantType, serde::Serialize, serde::Deserialize)]
 //! struct MyStruct {
@@ -30,7 +31,8 @@
 //!
 //! Additional derive macros are provided to serialize/deserialize GLib enum and flag types:
 //!
-//! ```
+#![cfg_attr(feature = "derive", doc = "```")]
+#![cfg_attr(not(feature = "derive"), doc = "```ignore")]
 //! #[derive(Copy, Clone, Debug, PartialEq, Eq, glib::Enum)]
 //! #[derive(glib_serde::VariantType, glib_serde::EnumSerialize, glib_serde::EnumDeserialize)]
 //! #[enum_type(name = "Direction")]
@@ -49,6 +51,7 @@
 //! ```
 
 pub use glib;
+#[cfg(feature = "derive")]
 pub use glib_serde_derive::*;
 pub use serde;
 

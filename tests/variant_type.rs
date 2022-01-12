@@ -1,6 +1,8 @@
 // SPDX-FileCopyrightText: 2021 Jason Francis <jafrancis999@gmail.com>
 // SPDX-License-Identifier: MIT
 
+#![cfg(feature = "derive")]
+
 use glib::{StaticVariantType, VariantTy};
 use glib_serde::{from_variant, prelude::*, to_variant, Variant};
 use std::collections::HashMap;
