@@ -55,6 +55,8 @@ pub use glib;
 pub use glib_serde_derive::*;
 pub use serde;
 
+pub mod any;
+pub use any::AnyVariant;
 mod enums;
 pub use enums::*;
 mod error;
