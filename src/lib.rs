@@ -30,6 +30,8 @@
 
 pub use glib;
 
+pub mod any;
+pub use any::AnyVariant;
 mod enums;
 pub use enums::*;
 mod error;
