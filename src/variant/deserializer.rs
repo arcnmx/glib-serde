@@ -276,7 +276,8 @@ impl<'de> de::Deserializer<'de> for &Variant {
         fields: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error> {
-        self.deserialize_tuple(fields.len(), visitor)
+        //self.deserialize_tuple(fields.len(), visitor)
+        self.deserialize_map(visitor)
     }
 
     fn deserialize_enum<V: Visitor<'de>>(
@@ -310,10 +311,10 @@ impl<'de> de::Deserializer<'de> for &Variant {
         self.deserialize_any(visitor)
     }
 
-    #[inline]
+    /*#[inline]
     fn is_human_readable(&self) -> bool {
         false
-    }
+    }*/
 }
 
 #[repr(transparent)]

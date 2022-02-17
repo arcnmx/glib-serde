@@ -46,3 +46,17 @@ assert_eq!(variant.to_string(), "'south'");
 let value: Direction = glib_serde::from_variant(&variant).unwrap();
 assert_eq!(value, Direction::South);
 ```
+
+## Tracking the various forms of serialization
+
+- `to_variant<T: Serialize + VariantType>(T) -> Variant`: requires type info via VariantType
+- `from_variant<T: Deserialize>(Variant) -> T`: deserialize any data into serde
+- `Serialize for crate::Variant`: as tuple struct (type, data)
+- `Deserialize for crate::Variant`: from tuple struct (type, data)
+
+Gaps:
+- `to_variant` shouldn't need any type info up-front
+- `Serialize for Variant`: in the same fashion as from_variant (from Variant to Serializer)
+- `Deserialize for Variant`: like to_variant, but without type info (from Deserializer to Variant)
+- `impl IntoDeserializer for Variant`: from_variant basically
+- `derive(VariantType)` should impl `ToVariant`/`FromVariant`, no?
