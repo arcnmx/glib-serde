@@ -12,6 +12,14 @@ newtype_wrapper! {
     pub AnyVariant(glib::Variant) into_variant
 }
 
+impl<'a> AnyVariant<'a> {
+    pub fn from_serde<S: Serialize>(value: &S) -> Result<Self, crate::Error> {
+        let serializer: VariantSerializer = todo!();
+
+        //value.serialize(serializer)
+    }
+}
+
 impl<'a> Into<crate::Variant> for AnyVariant<'a> { // TODO: From instead!
     fn into(self) -> crate::Variant {
         self.into_variant().into()
@@ -252,11 +260,14 @@ pub fn serialize<'a, T: Into<&'a glib::Variant>, S: Serializer>(var: T, serializ
     AnyVariant::from(var.into()).serialize(serializer)
 }
 
-pub fn list_type<'a, I: IntoIterator<Item=&'a Variant>>(vars: I) -> Option<Option<&'a VariantTy>> {
+fn list_type<'a, I: IntoIterator<Item=&'a Variant>>(vars: I) -> Option<Option<&'a VariantTy>> {
     vars.into_iter()
         .fold(None, |ty, var| match ty {
             None => Some(Some(var.type_())),
             res @ Some(Some(ty)) if ty == var.type_() => res,
             Some(_) => Some(None),
         })
+}
+
+pub struct VariantSerializer {
 }

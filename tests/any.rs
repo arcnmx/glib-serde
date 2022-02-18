@@ -1,19 +1,14 @@
-use glib_serde::{AnyVariant, VariantType, from_variant, to_variant};
+use glib_serde::{AnyVariant, from_variant, to_variant};
 use glib::ToVariant;
 use serde::{Serialize, Deserialize};
 
-#[derive(Debug, VariantType, Serialize, Deserialize, PartialOrd, PartialEq)]
+#[derive(Debug, glib::Variant, Serialize, Deserialize, PartialOrd, PartialEq)]
 struct TestDataVariant {
     numeric: u8,
     array: Vec<(String, u64)>,
     string: String,
-    explicit_var: glib_serde::Variant,
-}
-
-impl ToVariant for TestDataVariant {
-    fn to_variant(&self) -> glib::Variant {
-        to_variant(self).unwrap()
-    }
+    #[serde(with = "glib_serde::any_variant")]
+    explicit_var: glib::Variant,
 }
 
 impl TestDataVariant {
@@ -47,7 +42,7 @@ impl TestDataVariant {
 #[derive(Debug, Serialize, Deserialize, PartialOrd, PartialEq)]
 struct TestData {
     data: TestDataVariant,
-    #[serde(with = "glib_serde::any")]
+    #[serde(with = "glib_serde::any_variant")]
     transparent_var: glib::Variant,
     transparent_any: AnyVariant<'static>,
 }
@@ -87,7 +82,7 @@ fn serde_any() {
     println!("fromjson: {:?}", fromjson);
     assert_eq!(data, fromjson);
 
-    let variant = to_variant(&data.data).unwrap();
+    let variant = AnyVariant::from_serde(&data.data).unwrap().into_variant();
     println!("tovariant: {:?}", variant);
     assert_eq!(variant, data.data.variant().to_variant());
 
