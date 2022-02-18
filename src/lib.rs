@@ -30,8 +30,12 @@
 
 pub use glib;
 
-pub mod any;
-pub use any::AnyVariant;
+#[macro_use]
+mod macros;
+
+pub mod any_variant;
+pub use any_variant::AnyVariant;
+
 mod enums;
 pub use enums::*;
 mod error;
