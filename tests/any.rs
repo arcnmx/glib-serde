@@ -1,6 +1,6 @@
-use glib_serde::{AnyVariant, from_variant, to_variant};
-use glib::ToVariant;
-use serde::{Serialize, Deserialize};
+use glib_serde::{AnyVariant, any_variant};
+use glib::{ToVariant, StaticVariantType};
+use serde::{Serialize, Deserialize, de::IntoDeserializer};
 
 #[derive(Debug, glib::Variant, Serialize, Deserialize, PartialOrd, PartialEq)]
 struct TestDataVariant {
@@ -34,7 +34,11 @@ impl TestDataVariant {
         dict.insert("numeric", &(self.numeric as u64));
         dict.insert("array", &self.array);
         dict.insert("string", &self.string);
-        dict.insert("explicit_var", explicit_var);
+        if false {
+            dict.insert("explicit_var", explicit_var); // can't distinguish boxed variants properly .-.
+        } else {
+            dict.insert_value("explicit_var", explicit_var);
+        }
         dict.end()
     }
 }
@@ -82,28 +86,24 @@ fn serde_any() {
     println!("fromjson: {:?}", fromjson);
     assert_eq!(data, fromjson);
 
-    let variant = AnyVariant::from_serde(&data.data).unwrap().into_variant();
+    let variant = data.data.serialize(any_variant::Serializer::new(Some(&TestDataVariant::static_variant_type()))).unwrap();
     println!("tovariant: {:?}", variant);
     assert_eq!(variant, data.data.variant().to_variant());
 
-    let fromvariant: TestDataVariant = from_variant(&variant).unwrap();
+    let fromvariant: TestDataVariant = AnyVariant::from(variant).to_serde().unwrap();
     println!("fromvariant: {:?}", fromvariant);
     assert_eq!(data.data, fromvariant);
 
-    let fromvariant: TestData = from_variant(&data.variant().to_variant()).unwrap();
+    let fromvariant: TestData = AnyVariant::from(data.variant().to_variant()).to_serde().unwrap();
     println!("fromvariant: {:?}", fromvariant);
     assert_eq!(data, fromvariant);
 
     let anyfromjson: AnyVariant = serde_json::from_str(&json).unwrap();
     println!("anyfromjson: {:?}", anyfromjson);
-    // TODO: assert_eq!(anyfromjson.inner(), &data.vardict());
-    // - must support deserializing as arrays rather than tuples
-    // - doesn't support deserializing variant tuples to boxed tuples
-    // - normal_form, vardict key sorting, etc
+    assert_eq!(anyfromjson.inner(), &data.vardict());
 
-    /*let fromany = TestData::deserialize(anyfromjson.into_deserializer()).unwrap();
-    assert_eq!(fromany, data); // TODO: this requires a deserializer with `is_human_readable` set to be equivalent to JSON
-    */
+    let fromany = TestData::deserialize(anyfromjson.into_deserializer()).unwrap();
+    assert_eq!(fromany, data);
 
     let anytojson = serde_json::to_string(&anyfromjson).unwrap();
     assert_eq!(anytojson, json);

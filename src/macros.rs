@@ -1,10 +1,34 @@
 #[macro_export]
 macro_rules! newtype_wrapper {
-    ($vis:vis $id:ident($ty:ty) $owned:ident) => {
-        #[derive(Debug, Clone, PartialOrd, PartialEq, Hash)]
+    (
+        $(#[$meta:meta])*
+        $(@[
+            $(PartialOrd $partialord:ident)?
+            $(PartialEq $partialeq:ident)?
+            $(Display $display:ident)?
+            $(FromStr $fromstr:ident)?
+            $(GlibVariantWrapper $glibvariantwrapper:ident)?
+            $(StaticVariantType $staticvarianttype:ident)?
+            $(ToVariant $tovariant:ident)?
+            $(FromVariant $fromvariant:ident)?
+        ])*
+        $vis:vis $id:ident($ty:ty|$owned:ty) $into_owned:ident
+    ) => {
+        $(#[$meta])*
+        $($(#[derive($partialord)])?)*
+        $($(#[derive($partialeq)])?)*
+        #[repr(transparent)]
         $vis struct $id<'a>(std::borrow::Cow<'a, $ty>);
 
         impl<'a> $id<'a> {
+            pub fn wrap(v: $owned) -> Self {
+                Self(std::borrow::Cow::Owned(v))
+            }
+
+            pub fn borrow(v: &'a $ty) -> Self {
+                Self(std::borrow::Cow::Borrowed(v))
+            }
+
             pub fn inner<'s>(&'s self) -> &'a $ty where 's: 'a {
                 match self.0 {
                     std::borrow::Cow::Borrowed(s) => s,
@@ -12,14 +36,11 @@ macro_rules! newtype_wrapper {
                 }
             }
 
-            pub fn inner_mut(&mut self) -> Option<&mut $ty> {
-                match self.0 {
-                    std::borrow::Cow::Borrowed(_) => None,
-                    std::borrow::Cow::Owned(ref mut s) => Some(s),
-                }
+            pub fn inner_mut(&mut self) -> &mut $owned {
+                self.0.to_mut()
             }
 
-            pub fn $owned(self) -> $ty {
+            pub fn $into_owned(self) -> $owned {
                 self.into_inner().into_owned()
             }
 
@@ -32,21 +53,21 @@ macro_rules! newtype_wrapper {
             }
         }
 
-        impl<'a> From<$ty> for $id<'a> {
-            fn from(v: $ty) -> Self {
-                Self(std::borrow::Cow::Owned(v))
+        impl<'a> From<$owned> for $id<'a> {
+            fn from(v: $owned) -> Self {
+                Self::wrap(v)
             }
         }
 
         impl<'a> From<&'a $ty> for $id<'a> {
             fn from(v: &'a $ty) -> Self {
-                Self(std::borrow::Cow::Borrowed(v))
+                Self::borrow(v)
             }
         }
 
-        impl<'a> Into<$ty> for $id<'a> {
-            fn into(self) -> $ty {
-                self.into_variant()
+        impl<'a> Into<$owned> for $id<'a> {
+            fn into(self) -> $owned {
+                self.$into_owned()
             }
         }
 
@@ -63,5 +84,77 @@ macro_rules! newtype_wrapper {
                 self.inner()
             }
         }
+
+        $(
+            $(
+                impl<'a> $partialord<$ty> for $id<'a> {
+                    fn partial_cmp(&self, rhs: &$ty) -> Option<std::cmp::Ordering> {
+                        $partialord::partial_cmp(self.inner(), rhs)
+                    }
+                }
+            )?
+            $(
+                impl<'a> $partialeq<$ty> for $id<'a> {
+                    fn eq(&self, rhs: &$ty) -> bool {
+                        $partialeq::eq(self.inner(), rhs)
+                    }
+                }
+            )?
+            $(
+                impl<'a> std::fmt::$display for $id<'a> {
+                    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
+                        std::fmt::$display::fmt(self.inner(), f)
+                    }
+                }
+            )?
+            $(
+                impl<'a> std::str::$fromstr for $id<'a> {
+                    type Err = <$owned as std::str::$fromstr>::Err;
+                    fn from_str(str: &str) -> Result<Self, Self::Err> {
+                        <$owned as std::str::$fromstr>::from_str(str)
+                            .map(Into::into)
+                    }
+                }
+            )?
+            $(
+                impl<'a> crate::traits::$glibvariantwrapper<'a> for $id<'a> {
+                    fn variant_ref(&self) -> &glib::Variant {
+                        self.inner()
+                    }
+
+                    fn variant_cow(self) -> std::borrow::Cow<'a, glib::Variant> {
+                        self.into_inner()
+                    }
+
+                    fn into_variant(self) -> glib::Variant {
+                        self.$into_owned()
+                    }
+                }
+            )?
+
+            $(
+                impl<'a> glib::$staticvarianttype for $id<'a> {
+                    fn static_variant_type() -> std::borrow::Cow<'static, glib::VariantTy> {
+                        <$ty as glib::$staticvarianttype>::static_variant_type()
+                    }
+                }
+            )?
+
+            $(
+                impl<'a> glib::$tovariant for $id<'a> {
+                    fn to_variant(&self) -> glib::Variant {
+                        glib::$tovariant::to_variant(self.inner())
+                    }
+                }
+            )?
+
+            $(
+                impl<'a> glib::$fromvariant for $id<'a> {
+                    fn from_variant(variant: &glib::Variant) -> Option<Self> {
+                        glib::$fromvariant::from_variant(variant).map(Self::wrap)
+                    }
+                }
+            )?
+        )*
     };
 }

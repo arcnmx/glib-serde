@@ -3,9 +3,11 @@
 
 use std::collections::HashMap;
 
-use glib::{ToVariant, VariantTy};
+use glib::{Variant, ToVariant, VariantTy, StaticVariantType};
 use glib_serde::{
-    from_variant, prelude::*, to_variant, ObjectPath, Signature, Variant, VariantDict,
+    prelude::*,
+    AnyVariant, VariantDict,
+    from_variant, to_variant, any_variant,
 };
 
 #[test]
@@ -54,13 +56,19 @@ fn serialize_basic_types() {
     assert_eq!(variant.type_(), VariantTy::STRING);
     assert_eq!(variant.to_string(), "'124'");
 
-    let variant = to_variant(&ObjectPath::new("/com/org/Test").unwrap()).unwrap();
+    /*let variant = to_variant(&ObjectPath::new("/com/org/Test").unwrap()).unwrap();
     assert_eq!(variant.type_(), VariantTy::OBJECT_PATH);
     assert_eq!(variant.to_string(), "'/com/org/Test'");
 
     let variant = to_variant(&Signature::new("(asgva(in)a{sb})").unwrap()).unwrap();
     assert_eq!(variant.type_(), VariantTy::SIGNATURE);
-    assert_eq!(variant.to_string(), "'(asgva(in)a{sb})'");
+    assert_eq!(variant.to_string(), "'(asgva(in)a{sb})'");*/
+}
+
+fn to_typed_variant<S: serde::Serialize + StaticVariantType>(value: S) -> Result<glib::Variant, glib_serde::Error> {
+    value.serialize(
+        any_variant::Serializer::new(Some(&S::static_variant_type()))
+    )
 }
 
 #[test]
@@ -69,7 +77,7 @@ fn serialize_container_types() {
     assert_eq!(variant.type_().as_str(), "ms");
     assert_eq!(variant.to_string(), "'Hello'");
 
-    let variant = to_variant(&Option::<String>::None).unwrap();
+    let variant = to_typed_variant(&Option::<String>::None).unwrap();
     assert_eq!(variant.type_().as_str(), "ms");
     assert_eq!(variant.to_string(), "nothing");
 
@@ -85,18 +93,18 @@ fn serialize_container_types() {
     dict.insert("a", &200i32);
     dict.insert("b", &(300i64, 400.5f64));
     dict.insert("c", &(300i64, 500.5f64));
-    let variant = to_variant(&dict).unwrap();
+    let variant = to_variant(dict.as_serializable()).unwrap();
     assert_eq!(variant.type_(), VariantTy::VARDICT);
     assert_eq!(
         variant.to_string(),
         "{'b': <(int64 300, 400.5)>, 'a': <200>, 'c': <(int64 300, 500.5)>}"
     );
 
-    let variant = to_variant("Hello".to_variant().as_serializable()).unwrap();
+    let variant = to_typed_variant(&"Hello".to_variant().as_serializable()).unwrap();
     assert_eq!(variant.type_(), VariantTy::VARIANT);
     assert_eq!(variant.to_string(), "<'Hello'>");
 
-    let variant = to_variant(
+    /*let variant = to_variant(
         ObjectPath::new("/com/org/Test")
             .unwrap()
             .to_variant()
@@ -114,34 +122,34 @@ fn serialize_container_types() {
     )
     .unwrap();
     assert_eq!(variant.type_(), VariantTy::VARIANT);
-    assert_eq!(variant.to_string(), "<signature 'a(is)'>");
+    assert_eq!(variant.to_string(), "<signature 'a(is)'>");*/
 
     dict.insert("a", &"abc");
     dict.insert("b", &("hello", "world"));
-    let variant = to_variant(&dict.to_variant().as_serializable()).unwrap();
+    let variant = to_typed_variant(&dict.to_variant().as_serializable()).unwrap();
     assert_eq!(variant.type_(), VariantTy::VARIANT);
     assert_eq!(
         variant.to_string(),
         "<{'b': <('hello', 'world')>, 'a': <'abc'>}>"
     );
 
-    let variant = to_variant(Some("Hello").to_variant().as_serializable()).unwrap();
+    let variant = to_typed_variant(Some("Hello").to_variant().as_serializable()).unwrap();
     assert_eq!(variant.type_(), VariantTy::VARIANT);
     assert_eq!(variant.to_string(), "<@ms 'Hello'>");
 
-    let variant = to_variant(Option::<String>::None.to_variant().as_serializable()).unwrap();
+    /*let variant = to_typed_variant(Option::<String>::None.to_variant().as_serialized()).unwrap();
     assert_eq!(variant.type_(), VariantTy::VARIANT);
-    assert_eq!(variant.to_string(), "<@ms nothing>");
+    assert_eq!(variant.to_string(), "<@ms nothing>");*/
 
-    let variant = to_variant([1u32, 2u32, 3u32].to_variant().as_serializable()).unwrap();
+    let variant = to_typed_variant([1u32, 2u32, 3u32].to_variant().as_serializable()).unwrap();
     assert_eq!(variant.type_(), VariantTy::VARIANT);
     assert_eq!(variant.to_string(), "<[uint32 1, 2, 3]>");
 
-    let variant = to_variant(("Hello", "World").to_variant().as_serializable()).unwrap();
+    let variant = to_typed_variant(("Hello", "World").to_variant().as_serializable()).unwrap();
     assert_eq!(variant.type_(), VariantTy::VARIANT);
     assert_eq!(variant.to_string(), "<('Hello', 'World')>");
 
-    let variant = to_variant(
+    let variant = to_typed_variant(
         HashMap::from([(1i64, "Hello")])
             .to_variant()
             .as_serializable(),
@@ -193,13 +201,13 @@ fn deserialize_basic_types() {
     let value: String = from_variant(&s.parse::<Variant>().unwrap()).unwrap();
     assert_eq!(value, "123");
 
-    let s = "objectpath '/com/org/Test'";
+    /*let s = "objectpath '/com/org/Test'";
     let value: ObjectPath = from_variant(&s.parse::<Variant>().unwrap()).unwrap();
     assert_eq!(value.as_str(), "/com/org/Test");
 
     let s = "signature '(asgva(in)a{sb})'";
     let value: Signature = from_variant(&s.parse::<Variant>().unwrap()).unwrap();
-    assert_eq!(value.as_str(), "(asgva(in)a{sb})");
+    assert_eq!(value.as_str(), "(asgva(in)a{sb})");*/
 }
 
 #[test]
@@ -227,52 +235,52 @@ fn deserialize_container_types() {
     assert_eq!(value.lookup_value("c", None).unwrap().type_(), "(xd)");
 
     let s = "<'Hello'>";
-    let value: Variant = from_variant(&s.parse::<Variant>().unwrap()).unwrap();
+    let value: AnyVariant = from_variant(&s.parse::<Variant>().unwrap()).unwrap();
     assert_eq!(value.type_(), "s");
     assert_eq!(value.str().unwrap(), "Hello");
 
-    let s = "<objectpath '/com/org/Test'>";
-    let value: Variant = from_variant(&s.parse::<Variant>().unwrap()).unwrap();
+    /*let s = "<objectpath '/com/org/Test'>";
+    let value: AnyVariant = from_variant(&s.parse::<Variant>().unwrap()).unwrap();
     assert_eq!(value.type_(), "o");
     assert_eq!(value.str().unwrap(), "/com/org/Test");
 
     let s = "<signature 'a(is)'>";
-    let value: Variant = from_variant(&s.parse::<Variant>().unwrap()).unwrap();
+    let value: AnyVariant = from_variant(&s.parse::<Variant>().unwrap()).unwrap();
     assert_eq!(value.type_(), "g");
-    assert_eq!(value.str().unwrap(), "a(is)");
+    assert_eq!(value.str().unwrap(), "a(is)");*/
 
-    let s = "<{'b': <('hello', 'world')>, 'a': <'abc'>}>";
-    let value: Variant = from_variant(&s.parse::<Variant>().unwrap()).unwrap();
+    /*let s = "<{'b': <('hello', 'world')>, 'a': <'abc'>}>";
+    let value: AnyVariant = from_variant(&s.parse::<Variant>().unwrap()).unwrap();
     assert_eq!(value.type_(), "a{sv}");
     let value = value.get::<VariantDict>().unwrap();
     assert_eq!(value.lookup_value("a", None).unwrap().type_(), "s");
-    assert_eq!(value.lookup_value("b", None).unwrap().type_(), "(ss)");
+    assert_eq!(value.lookup_value("b", None).unwrap().type_(), "(ss)");*/
 
     let s = "<@ms 'Hello'>";
-    let value: Variant = from_variant(&s.parse::<Variant>().unwrap()).unwrap();
+    let value: AnyVariant = from_variant(&s.parse::<Variant>().unwrap()).unwrap();
     assert_eq!(value.type_(), "ms");
-    assert_eq!(value.maybe().flatten().unwrap().str().unwrap(), "Hello");
+    assert_eq!(value.as_maybe().unwrap().str().unwrap(), "Hello");
 
     let s = "<@ms nothing>";
-    let value: Variant = from_variant(&s.parse::<Variant>().unwrap()).unwrap();
-    assert_eq!(value.type_(), "ms");
-    assert_eq!(value.maybe().unwrap(), None);
+    let value: AnyVariant = from_variant(&s.parse::<Variant>().unwrap()).unwrap();
+    assert!(value.type_().is_maybe());
+    assert_eq!(value.as_maybe(), None);
 
     let s = "<[uint32 1, 2, 3]>";
-    let value: Variant = from_variant(&s.parse::<Variant>().unwrap()).unwrap();
+    let value: AnyVariant = from_variant(&s.parse::<Variant>().unwrap()).unwrap();
     assert_eq!(value.type_(), "au");
     assert_eq!(value.fixed_array::<u32>().unwrap(), [1u32, 2, 3]);
 
-    let s = "<('Hello', 'World')>";
-    let value: Variant = from_variant(&s.parse::<Variant>().unwrap()).unwrap();
+    /*let s = "<('Hello', 'World')>";
+    let value: AnyVariant = from_variant(&s.parse::<Variant>().unwrap()).unwrap();
     assert_eq!(value.type_(), "(ss)");
     assert_eq!(
         value.get::<(String, String)>().unwrap(),
         ("Hello".into(), "World".into())
-    );
+    );*/
 
     let s = "<{int64 1: 'Hello'}>";
-    let value: Variant = from_variant(&s.parse::<Variant>().unwrap()).unwrap();
+    let value: AnyVariant = from_variant(&s.parse::<Variant>().unwrap()).unwrap();
     assert_eq!(value.type_(), "a{xs}");
     assert_eq!(
         value.get::<HashMap<i64, String>>().unwrap(),

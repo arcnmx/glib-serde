@@ -1,50 +1,62 @@
 use serde::{
-    Deserialize, Deserializer,
-    Serialize, Serializer,
-    de::{self, Visitor, Error as _, IntoDeserializer},
-    ser::{SerializeSeq, Error as _, SerializeMap, SerializeTuple, SerializeTupleStruct},
+    Deserialize, Serialize,
+    de::{self, Visitor},
+    ser::{self, SerializeSeq, Error as _, SerializeMap, SerializeTuple, SerializeTupleStruct},
 };
 use glib::{Variant, ToVariant, VariantClass, VariantTy, VariantType};
 use std::fmt;
-use std::borrow::Cow;
+use crate::util;
+
+pub mod deserializer;
+pub use deserializer::Deserializer;
+
+pub mod serializer;
+pub use serializer::Serializer;
 
 newtype_wrapper! {
-    pub AnyVariant(glib::Variant) into_variant
+    #[derive(Debug, Clone, Hash)]
+    @[PartialOrd PartialOrd] @[PartialEq PartialEq]
+    @[Display Display] @[FromStr FromStr]
+    @[GlibVariantWrapper GlibVariantWrapper]
+    @[StaticVariantType StaticVariantType] @[ToVariant ToVariant] @[FromVariant FromVariant]
+    pub AnyVariant(Variant | Variant) into_variant
+}
+
+pub fn deserialize<'a, T: From<Variant>, D: de::Deserializer<'a>>(deserializer: D) -> Result<T, D::Error> {
+    AnyVariant::deserialize(deserializer).map(|v| v.into_variant().into())
+}
+
+pub fn serialize<T: AsRef<Variant>, S: ser::Serializer>(var: T, serializer: S) -> Result<S::Ok, S::Error> {
+    AnyVariant::from(var.as_ref()).serialize(serializer)
 }
 
 impl<'a> AnyVariant<'a> {
-    pub fn from_serde<S: Serialize>(value: &S) -> Result<Self, crate::Error> {
-        let serializer: VariantSerializer = todo!();
+    pub fn from_serde<S: Serialize>(value: S) -> Result<Self, crate::Error> {
+        let serializer = Serializer::default();
 
-        //value.serialize(serializer)
+        value.serialize(serializer)
+            .map(From::from)
+    }
+
+    pub fn to_serde<'de, D: Deserialize<'de>>(&'de self) -> Result<D, crate::Error> {
+        let deserializer = Deserializer::from(self);
+
+        D::deserialize(deserializer)
     }
 }
 
-impl<'a> Into<crate::Variant> for AnyVariant<'a> { // TODO: From instead!
-    fn into(self) -> crate::Variant {
-        self.into_variant().into()
-    }
-}
-
-impl<'a> glib::StaticVariantType for AnyVariant<'a> {
-    fn static_variant_type() -> Cow<'static, VariantTy> {
-        <glib::Variant as glib::StaticVariantType>::static_variant_type()
-    }
-}
-impl<'a> crate::VariantType for AnyVariant<'a> { }
-
-impl<'a, 'de> IntoDeserializer<'de, crate::Error> for &'de AnyVariant<'a> where
+impl<'a, 'de> de::IntoDeserializer<'de, crate::Error> for &'de AnyVariant<'a> where
     'de: 'a
 {
-    type Deserializer = AnyVariant<'a>;
+    type Deserializer = Deserializer<'a>;
 
     fn into_deserializer(self) -> Self::Deserializer {
-        self.borrowed()
+        self.into()
     }
 }
 
 impl<'a> Serialize for AnyVariant<'a> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+    fn serialize<S: ser::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match self.classify() {
             VariantClass::Boolean => self.get::<bool>().unwrap().serialize(serializer),
             VariantClass::Byte => self.get::<u8>().unwrap().serialize(serializer),
@@ -108,20 +120,19 @@ impl<'a> Serialize for AnyVariant<'a> {
 }
 
 impl<'a, 'de> Deserialize<'de> for AnyVariant<'a> {
-    fn deserialize<D: Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+    fn deserialize<D: de::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
         struct VariantVisitor;
 
         impl<'de> Visitor<'de> for VariantVisitor {
-            type Value = glib::Variant;
+            type Value = Variant;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
                 formatter.write_str("glib::Variant")
             }
 
-            fn visit_newtype_struct<D>(self, deserializer: D) -> Result<Self::Value, D::Error> where
-                D: Deserializer<'de>,
-            {
-                todo!()
+            fn visit_newtype_struct<D: de::Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
+                // TODO: is this remotely correct?
+                deserializer.deserialize_any(Self)
             }
 
             fn visit_i8<E: de::Error>(self, v: i8) -> Result<Self::Value, E> {
@@ -169,11 +180,11 @@ impl<'a, 'de> Deserialize<'de> for AnyVariant<'a> {
             }
 
             fn visit_none<E: de::Error>(self) -> Result<Self::Value, E> {
-                Ok(glib::Variant::from_none(VariantTy::VARIANT))
+                Ok(Variant::from_none(VariantTy::VARIANT))
             }
 
-            fn visit_some<D: Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
-                deserialize(deserializer).map(|v| glib::Variant::from_some(&v))
+            fn visit_some<D: de::Deserializer<'de>>(self, deserializer: D) -> Result<Self::Value, D::Error> {
+                deserialize(deserializer).map(|v| Variant::from_some(&v))
             }
 
             fn visit_bool<E: de::Error>(self, v: bool) -> Result<Self::Value, E> {
@@ -187,87 +198,33 @@ impl<'a, 'de> Deserialize<'de> for AnyVariant<'a> {
             fn visit_seq<A: de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
                 let mut values = Vec::with_capacity(seq.size_hint().unwrap_or(0));
                 while let Some(value) = seq.next_element::<AnyVariant<'de>>()? {
-                    values.push(value.into());
+                    values.push(value);
                 }
-                Ok(match list_type(values.iter()) {
-                    Some(Some(ty)) => {
-                        let ty = ty.to_owned();
-                        Variant::array_from_iter_with_type(&ty, values)
-                    },
-                    None | Some(None) => Variant::tuple_from_iter(values),
-                })
+                Ok(util::VariantList::with_variants(&values, VariantTy::ANY)
+                    .to_tuple_or_array())
             }
 
             fn visit_map<A: de::MapAccess<'de>>(self, mut map: A) -> Result<Self::Value, A::Error> {
                 let mut entries = Vec::with_capacity(map.size_hint().unwrap_or(0));
-                /*while let Some((key, value)) = map.next_entry::<AnyVariant, AnyVariant>()? {
-                    entries.push((key.to_variant(), value.to_variant()));
-                }*/
                 while let Some((key, value)) = map.next_entry::<AnyVariant, AnyVariant>()? {
-                    // TODO: use dynamic type variant above if all key+value types are consistent
                     entries.push((key, value));
                 }
-                let key_type = list_type(entries.iter().map(|&(ref k, _)| k.inner()));
-                let value_type = list_type(entries.iter().map(|&(_, ref v)| v.inner()));
 
-                let key_type = match key_type {
-                    Some(Some(ty)) => Ok(ty),
-                    None => Ok(VariantTy::STRING),
-                    Some(None) => Err(A::Error::custom("inconsistent map key type")),
-                }?;
+                let keys = entries.iter().map(|&(ref k, _)| k.inner());
+                let keys = util::VariantList::with_variants(keys, VariantTy::STRING);
 
-                Ok(match value_type {
-                    Some(Some(value_type)) => {
-                        let ty = VariantType::new_dict_entry(&key_type, value_type);
-                        Variant::array_from_iter_with_type(&ty, entries.iter().map(|(k, v)|
-                            Variant::from_dict_entry(k, v)
-                        ))
-                    },
-                    None | Some(None) => {
-                        let ty = VariantType::new_dict_entry(&key_type, VariantTy::VARIANT);
-                        Variant::array_from_iter_with_type(&ty, entries.iter().map(|(k, v)|
-                            Variant::from_dict_entry(k, &Variant::from_variant(v))
-                        ))
-                    },
-                })
+                let values = entries.iter().map(|&(_, ref v)| v.inner());
+                let values = util::VariantList::with_variants(values, VariantTy::VARIANT);
+
+                let ty = VariantType::new_dict_entry(keys.elem_type(), values.elem_type());
+                let entries = keys.iter()
+                    .zip(values.iter())
+                    .map(|(ref k, ref v)| Variant::from_dict_entry(k, v));
+                Ok(Variant::array_from_iter_with_type(&ty, entries))
             }
         }
 
         deserializer.deserialize_any(VariantVisitor)
             .map(Self::from)
     }
-}
-
-impl<'a, 'de> Deserializer<'de> for AnyVariant<'a> {
-    type Error = crate::Error;
-
-    fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
-        todo!()
-    }
-
-    serde::forward_to_deserialize_any! {
-        bool i8 i16 i32 i64 i128 u8 u16 u32 u64 u128 f32 f64 char str string
-            bytes byte_buf option unit unit_struct newtype_struct seq tuple
-            tuple_struct map struct enum identifier ignored_any
-    }
-}
-
-pub fn deserialize<'a, T: From<glib::Variant>, D: Deserializer<'a>>(deserializer: D) -> Result<T, D::Error> {
-    AnyVariant::deserialize(deserializer).map(|v| v.into_variant().into())
-}
-
-pub fn serialize<'a, T: Into<&'a glib::Variant>, S: Serializer>(var: T, serializer: S) -> Result<S::Ok, S::Error> {
-    AnyVariant::from(var.into()).serialize(serializer)
-}
-
-fn list_type<'a, I: IntoIterator<Item=&'a Variant>>(vars: I) -> Option<Option<&'a VariantTy>> {
-    vars.into_iter()
-        .fold(None, |ty, var| match ty {
-            None => Some(Some(var.type_())),
-            res @ Some(Some(ty)) if ty == var.type_() => res,
-            Some(_) => Some(None),
-        })
-}
-
-pub struct VariantSerializer {
 }

@@ -1,7 +1,7 @@
 // SPDX-FileCopyrightText: 2021 Jason Francis <jafrancis999@gmail.com>
 // SPDX-License-Identifier: MIT
 
-use std::{fmt::Display, num::TryFromIntError};
+use std::{fmt::Display, num::TryFromIntError, convert::Infallible};
 
 use glib::{variant::VariantTypeMismatchError, BoolError};
 
@@ -76,6 +76,12 @@ impl From<VariantTypeMismatchError> for Error {
 impl From<TryFromIntError> for Error {
     fn from(e: TryFromIntError) -> Self {
         Self::Int(e)
+    }
+}
+
+impl From<Infallible> for Error {
+    fn from(e: Infallible) -> Self {
+        match e { }
     }
 }
 
