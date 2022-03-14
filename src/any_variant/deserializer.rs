@@ -31,6 +31,13 @@ impl<'a> Deserializer<'a> {
         }
     }
 
+    pub fn flatten(self) -> Self {
+        Self {
+            variant: self.variant(),
+            humanize: self.humanize,
+        }
+    }
+
     pub fn is_of_type(&self, wanted: &VariantTy) -> Result<(), Error> {
         match self.variant.type_() {
             ty if ty.is_subtype_of(wanted) =>
@@ -86,52 +93,40 @@ impl<'a> Deserializer<'a> {
         }
     }
 
-    pub fn type_(&self) -> Cow<VariantTy> {
+    pub fn variant(&self) -> Cow<'a, Variant> {
         match self.variant.type_() {
             ty if ty == VariantTy::VARIANT => Cow::Owned(
-                self.change_variant(self.variant.as_variant().unwrap()).type_().into_owned()
+                self.change_variant(self.variant.as_variant().unwrap()).variant().into_owned()
             ),
-            ty => Cow::Borrowed(ty),
+            _ => self.variant.clone(),
+        }
+    }
+
+    pub fn type_(&self) -> Cow<'a, VariantTy> {
+        match self.variant() {
+            Cow::Owned(v) => Cow::Owned(v.type_().to_owned()),
+            Cow::Borrowed(v) => Cow::Borrowed(v.type_()),
         }
     }
 
     pub fn str(&self) -> Result<Cow<str>, Error> {
-        match self.variant.type_() {
-            ty if ty == VariantTy::VARIANT => Ok(Cow::Owned(
-                self.change_variant(self.variant.as_variant().unwrap()).str()?.into_owned()
-            )),
-            ty => match self.variant.str() {
-                Some(s) => Ok(Cow::Borrowed(s)),
-                None => Err(Error::StrMismatch(ty.to_owned())),
-            },
-        }
+        let str = match self.variant() {
+            Cow::Owned(v) => v.str().map(|s| Cow::Owned(s.into())),
+            Cow::Borrowed(v) => v.str().map(Cow::Borrowed),
+        };
+        str.ok_or_else(|| Error::StrMismatch(self.type_().into_owned()))
     }
 
     fn container(self) -> ContainerDeserializer<'a> {
-        let de = match self.variant.type_() {
-            ty if ty == VariantTy::VARIANT =>
-                self.change_variant(self.variant.as_variant().unwrap()),
-            _ => self,
-        };
-        ContainerDeserializer::new(de)
+        ContainerDeserializer::new(self.flatten())
     }
 
     fn container_enum(self) -> EnumDeserializer<'a> {
-        let de = match self.variant.type_() {
-            ty if ty == VariantTy::VARIANT =>
-                self.change_variant(self.variant.as_variant().unwrap()),
-            _ => self,
-        };
-        EnumDeserializer::new(de)
+        EnumDeserializer::new(self.flatten())
     }
 
     fn unit_enum(self) -> UnitEnumDeserializer<'a> {
-        let de = match self.variant.type_() {
-            ty if ty == VariantTy::VARIANT =>
-                self.change_variant(self.variant.as_variant().unwrap()),
-            _ => self,
-        };
-        UnitEnumDeserializer::new(de)
+        UnitEnumDeserializer::new(self.flatten())
     }
 }
 
@@ -304,10 +299,9 @@ impl<'a, 'de> de::Deserializer<'de> for Deserializer<'a> {
     }
 
     fn deserialize_unit<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
+        let variant = self.variant();
         match self.variant.type_() {
-            ty if ty == VariantTy::VARIANT =>
-                self.change_variant(self.variant.as_variant().unwrap()).deserialize_unit(visitor),
-            ty if ty.is_array() && self.variant.n_children() == 0 =>
+            ty if ty.is_array() && variant.n_children() == 0 =>
                 visitor.visit_unit(),
             _ => {
                 self.variant.try_get::<()>()?;
