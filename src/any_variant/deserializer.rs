@@ -3,6 +3,7 @@ use glib::{Variant, VariantClass, VariantTy, FixedSizeVariantType, variant::Vari
 use std::borrow::Cow;
 use crate::Error;
 
+#[derive(Debug, Clone)]
 pub struct Deserializer<'a> {
     variant: Cow<'a, Variant>,
     humanize: bool,
@@ -114,6 +115,24 @@ impl<'a> Deserializer<'a> {
         };
         ContainerDeserializer::new(de)
     }
+
+    fn container_enum(self) -> EnumDeserializer<'a> {
+        let de = match self.variant.type_() {
+            ty if ty == VariantTy::VARIANT =>
+                self.change_variant(self.variant.as_variant().unwrap()),
+            _ => self,
+        };
+        EnumDeserializer::new(de)
+    }
+
+    fn unit_enum(self) -> UnitEnumDeserializer<'a> {
+        let de = match self.variant.type_() {
+            ty if ty == VariantTy::VARIANT =>
+                self.change_variant(self.variant.as_variant().unwrap()),
+            _ => self,
+        };
+        UnitEnumDeserializer::new(de)
+    }
 }
 
 impl<'a, T: crate::traits::GlibVariantWrapper<'a>> From<T> for Deserializer<'a> {
@@ -136,7 +155,7 @@ impl<'a, 'de> de::Deserializer<'de> for Deserializer<'a> {
     }
 
     serde::forward_to_deserialize_any! {
-        enum ignored_any
+        ignored_any
     }
 
     fn deserialize_any<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
@@ -404,18 +423,18 @@ impl<'a, 'de> de::Deserializer<'de> for Deserializer<'a> {
         }
     }
 
-    /*fn deserialize_enum<V: Visitor<'de>>(
+    fn deserialize_enum<V: Visitor<'de>>(
         self,
         _name: &'static str,
         _variants: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error> {
-        if self.is_container() {
-            visitor.visit_enum(EnumDeserializer::new(self))
-        } else {
-            visitor.visit_enum(UnitEnumDeserializer::new(self))
+        match self.type_() {
+            ty if ty.is_container() =>
+                visitor.visit_enum(self.container_enum()),
+            _ => visitor.visit_enum(self.unit_enum()),
         }
-    }*/
+    }
 
     fn deserialize_identifier<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
         match self.variant.classify() {
@@ -432,22 +451,14 @@ impl<'a, 'de> de::Deserializer<'de> for Deserializer<'a> {
     }
 }
 
-/*
 #[repr(transparent)]
 struct EnumDeserializer<'v> {
-    input: &'v Variant,
+    de: Deserializer<'v>,
 }
 
 impl<'v> EnumDeserializer<'v> {
-    fn new(input: &'v Variant) -> Self {
-        Self { input }
-    }
-    fn value(&self) -> Result<Variant, Error> {
-        self.input
-            .try_child_value(1)
-            .and_then(|v| v.as_variant())
-            .ok_or_else(|| Error::UnsupportedType(self.input.type_().to_owned()))
-            .map(Into::into)
+    fn new(de: Deserializer<'v>) -> Self {
+        Self { de }
     }
 }
 
@@ -455,16 +466,8 @@ impl<'v, 'de> de::EnumAccess<'de> for EnumDeserializer<'v> {
     type Error = Error;
     type Variant = Self;
 
-    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
-    where
-        V: de::DeserializeSeed<'de>,
-    {
-        let tag = self
-            .input
-            .try_child_value(0)
-            .ok_or_else(|| Error::UnsupportedType(self.input.type_().to_owned()))?;
-        let value = seed.deserialize(tag.as_serializable())?;
-        Ok((value, self))
+    fn variant_seed<V: de::DeserializeSeed<'de>>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error> {
+        todo!()
     }
 }
 
@@ -472,44 +475,34 @@ impl<'v, 'de> de::VariantAccess<'de> for EnumDeserializer<'v> {
     type Error = Error;
 
     fn unit_variant(self) -> Result<(), Self::Error> {
-        self.value()?.is_of_type(VariantTy::UNIT)?;
-        Ok(())
+        todo!()
     }
 
-    fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
-    where
-        T: de::DeserializeSeed<'de>,
-    {
-        seed.deserialize(&self.value()?)
+    fn newtype_variant_seed<T: de::DeserializeSeed<'de>>(self, seed: T) -> Result<T::Value, Self::Error> {
+        todo!()
     }
 
-    fn tuple_variant<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        self.value()?.deserialize_seq(visitor)
+    fn tuple_variant<V: Visitor<'de>>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error> {
+        todo!()
     }
 
-    fn struct_variant<V>(
+    fn struct_variant<V: Visitor<'de>>(
         self,
         _fields: &'static [&'static str],
         visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        self.value()?.deserialize_seq(visitor)
+    ) -> Result<V::Value, Self::Error> {
+        todo!()
     }
 }
 
 #[repr(transparent)]
 struct UnitEnumDeserializer<'v> {
-    input: &'v Variant,
+    de: Deserializer<'v>,
 }
 
 impl<'v> UnitEnumDeserializer<'v> {
-    fn new(input: &'v Variant) -> Self {
-        Self { input }
+    fn new(de: Deserializer<'v>) -> Self {
+        Self { de }
     }
 }
 
@@ -517,11 +510,8 @@ impl<'v, 'de> de::EnumAccess<'de> for UnitEnumDeserializer<'v> {
     type Error = Error;
     type Variant = Self;
 
-    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
-    where
-        V: de::DeserializeSeed<'de>,
-    {
-        let value = seed.deserialize(self.input)?;
+    fn variant_seed<V: de::DeserializeSeed<'de>>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error> {
+        let value = seed.deserialize(self.de.clone())?;
         Ok((value, self))
     }
 }
@@ -533,31 +523,22 @@ impl<'v, 'de> de::VariantAccess<'de> for UnitEnumDeserializer<'v> {
         Ok(())
     }
 
-    fn newtype_variant_seed<T>(self, _seed: T) -> Result<T::Value, Self::Error>
-    where
-        T: de::DeserializeSeed<'de>,
-    {
-        Err(Error::UnsupportedType(self.input.type_().to_owned()))
+    fn newtype_variant_seed<T: de::DeserializeSeed<'de>>(self, _seed: T) -> Result<T::Value, Self::Error> {
+        Err(Error::UnsupportedType(self.de.type_().into_owned()))
     }
 
-    fn tuple_variant<V>(self, _len: usize, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        Err(Error::UnsupportedType(self.input.type_().to_owned()))
+    fn tuple_variant<V: Visitor<'de>>(self, _len: usize, _visitor: V) -> Result<V::Value, Self::Error> {
+        Err(Error::UnsupportedType(self.de.type_().into_owned()))
     }
 
-    fn struct_variant<V>(
+    fn struct_variant<V: Visitor<'de>>(
         self,
         _fields: &'static [&'static str],
         _visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: Visitor<'de>,
-    {
-        Err(Error::UnsupportedType(self.input.type_().to_owned()))
+    ) -> Result<V::Value, Self::Error> {
+        Err(Error::UnsupportedType(self.de.type_().into_owned()))
     }
-}*/
+}
 
 struct FixedSeqDeserializer<'v, 'de, V: FixedSizeVariantType + IntoDeserializer<'de, Error>> {
     input: &'v [V],

@@ -108,3 +108,15 @@ fn serde_any() {
     let anytojson = serde_json::to_string(&anyfromjson).unwrap();
     assert_eq!(anytojson, json);
 }
+
+#[derive(Copy, Clone, Debug, PartialEq, Deserialize, Serialize)]
+enum SimpleEnum {
+    A,
+    B,
+}
+
+#[test]
+fn serde_enum() {
+    let a: SimpleEnum = AnyVariant::from("A".to_variant()).to_serde().unwrap();
+    assert_eq!(SimpleEnum::A, a);
+}
