@@ -291,10 +291,13 @@ impl<'a, 'de> de::Deserializer<'de> for Deserializer<'a> {
     }
 
     fn deserialize_option<V: Visitor<'de>>(self, visitor: V) -> Result<V::Value, Self::Error> {
-        self.is_of_type(VariantTy::MAYBE)?;
-        match self.variant.as_maybe() {
-            Some(child) => visitor.visit_some(self.change_variant(child)),
-            None => visitor.visit_none(),
+        match self.type_() {
+            ty if ty.is_maybe() => match self.variant().as_maybe() {
+                Some(child) => visitor.visit_some(self.change_variant(child)),
+                None => visitor.visit_none(),
+            },
+            ty if ty == VariantTy::UNIT => visitor.visit_unit(),
+            _ => visitor.visit_some(self),
         }
     }
 
@@ -371,7 +374,12 @@ impl<'a, 'de> de::Deserializer<'de> for Deserializer<'a> {
         len: usize,
         visitor: V,
     ) -> Result<V::Value, Self::Error> {
-        self.is_of_type(VariantTy::TUPLE)?;
+        match self.type_() {
+            ty if ty.is_tuple() || ty.is_dict_entry() || ty.is_array() => (),
+            ty => return Err(Error::Mismatch(
+                VariantTypeMismatchError::new(ty.into_owned(), VariantTy::TUPLE.to_owned())
+            )),
+        }
         let de = self.container();
         if de.de.variant.n_children() != len {
             return Err(Error::LengthMismatch {
