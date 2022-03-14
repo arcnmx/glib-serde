@@ -5,6 +5,7 @@ macro_rules! newtype_wrapper {
         $(@[
             $(PartialOrd $partialord:ident)?
             $(PartialEq $partialeq:ident)?
+            $(FromGlibVariantWrapper($($fromglibvariantwrapper:ident),*))?
             $(Display $display:ident)?
             $(FromStr $fromstr:ident)?
             $(GlibVariantWrapper $glibvariantwrapper:ident)?
@@ -50,6 +51,12 @@ macro_rules! newtype_wrapper {
 
             pub fn borrowed<'s>(&'s self) -> Self where 's: 'a {
                 Self(std::borrow::Cow::Borrowed(self.inner()))
+            }
+        }
+
+        impl<'a> From<std::borrow::Cow<'a, $ty>> for $id<'a> {
+            fn from(v: std::borrow::Cow<'a, $ty>) -> Self {
+                Self(v)
             }
         }
 
@@ -131,6 +138,19 @@ macro_rules! newtype_wrapper {
                     }
                 }
             )?
+            $($(
+                impl<'a> From<crate::$fromglibvariantwrapper<'a>> for $id<'a> {
+                    fn from(v: crate::$fromglibvariantwrapper<'a>) -> Self {
+                        crate::traits::GlibVariantWrapper::variant_cow(v).into()
+                    }
+                }
+
+                impl<'a> From<&'a crate::$fromglibvariantwrapper<'a>> for $id<'a> {
+                    fn from(v: &'a crate::$fromglibvariantwrapper<'a>) -> Self {
+                        crate::traits::GlibVariantWrapper::variant_cow(v).into()
+                    }
+                }
+            )*)?
 
             $(
                 impl<'a> glib::$staticvarianttype for $id<'a> {

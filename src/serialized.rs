@@ -12,14 +12,14 @@ newtype_wrapper! {
     #[derive(Debug, Clone, Hash)]
     @[PartialOrd PartialOrd] @[PartialEq PartialEq]
     @[Display Display] @[FromStr FromStr]
-    @[GlibVariantWrapper GlibVariantWrapper]
+    @[GlibVariantWrapper GlibVariantWrapper] @[FromGlibVariantWrapper(Variant, AnyVariant, PrettyVariant)]
     @[StaticVariantType StaticVariantType] @[ToVariant ToVariant] @[FromVariant FromVariant]
     pub SerializedVariant(Variant | Variant) into_variant
 }
 
 pub type SerializedData<'a> = (crate::VariantType<'a>, Cow<'a, [u8]>);
 
-pub const NEWTYPE_NAME: &'static str = "SerializedVariant";
+pub const NEWTYPE_NAME: &'static str = "glib_serde::SerializedVariant";
 
 pub fn deserialize<'a, T: From<Variant>, D: Deserializer<'a>>(deserializer: D) -> Result<T, D::Error> {
     SerializedVariant::deserialize(deserializer).map(|v| v.into_variant().into())

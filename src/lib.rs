@@ -50,6 +50,9 @@ pub use variant_type::VariantType;
 pub mod variant_dict;
 pub use variant_dict::VariantDict;
 
+pub mod variant;
+pub use variant::{Variant, serialize, deserialize};
+
 pub(crate) mod util;
 
 /*mod enums;

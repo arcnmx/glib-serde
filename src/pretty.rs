@@ -10,12 +10,12 @@ newtype_wrapper! {
     #[derive(Debug, Clone, Hash)]
     @[PartialOrd PartialOrd] @[PartialEq PartialEq]
     @[Display Display] @[FromStr FromStr]
-    @[GlibVariantWrapper GlibVariantWrapper]
+    @[GlibVariantWrapper GlibVariantWrapper] @[FromGlibVariantWrapper(Variant, AnyVariant, SerializedVariant)]
     @[StaticVariantType StaticVariantType] @[ToVariant ToVariant] @[FromVariant FromVariant]
     pub PrettyVariant(Variant | Variant) into_variant
 }
 
-pub const NEWTYPE_NAME: &'static str = "PrettyVariant";
+pub const NEWTYPE_NAME: &'static str = "glib_serde::PrettyVariant";
 
 pub fn deserialize<'a, T: From<Variant>, D: Deserializer<'a>>(deserializer: D) -> Result<T, D::Error> {
     PrettyVariant::deserialize(deserializer).map(|v| v.into_variant().into())

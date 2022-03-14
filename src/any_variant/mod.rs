@@ -17,7 +17,7 @@ newtype_wrapper! {
     #[derive(Debug, Clone, Hash)]
     @[PartialOrd PartialOrd] @[PartialEq PartialEq]
     @[Display Display] @[FromStr FromStr]
-    @[GlibVariantWrapper GlibVariantWrapper]
+    @[GlibVariantWrapper GlibVariantWrapper] @[FromGlibVariantWrapper(Variant, SerializedVariant, PrettyVariant)]
     @[StaticVariantType StaticVariantType] @[ToVariant ToVariant] @[FromVariant FromVariant]
     pub AnyVariant(Variant | Variant) into_variant
 }
