@@ -421,7 +421,7 @@ impl<'a, 'de> de::Deserializer<'de> for Deserializer<'a> {
         if self.is_of_type(VariantTy::DICTIONARY).is_ok() {
             self.deserialize_map(visitor)
         } else {
-            self.deserialize_tuple(fields.len(), visitor)
+            self.deserialize_seq(visitor)
         }
     }
 
