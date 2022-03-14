@@ -28,7 +28,7 @@ pub fn serialize<T: AsRef<Variant>, S: Serializer>(var: T, serializer: S) -> Res
 impl<'a> Serialize for PrettyVariant<'a> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         let pretty = self.print(true);
-        serializer.serialize_newtype_struct(NEWTYPE_NAME, &pretty)
+        serializer.serialize_newtype_struct(NEWTYPE_NAME, pretty.as_str())
     }
 }
 

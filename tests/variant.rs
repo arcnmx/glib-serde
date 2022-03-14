@@ -14,55 +14,55 @@ use glib_serde::{
 fn serialize_basic_types() {
     let variant = to_variant(&true).unwrap();
     assert_eq!(variant.type_(), VariantTy::BOOLEAN);
-    assert_eq!(variant.to_string(), "true");
+    assert_eq!(variant.print(false), "true");
 
     let variant = to_variant(&-3i16).unwrap();
     assert_eq!(variant.type_(), VariantTy::INT16);
-    assert_eq!(variant.to_string(), "-3");
+    assert_eq!(variant.print(false), "-3");
 
     let variant = to_variant(&-4i32).unwrap();
     assert_eq!(variant.type_(), VariantTy::INT32);
-    assert_eq!(variant.to_string(), "-4");
+    assert_eq!(variant.print(false), "-4");
 
     let variant = to_variant(&-5i64).unwrap();
     assert_eq!(variant.type_(), VariantTy::INT64);
-    assert_eq!(variant.to_string(), "-5");
+    assert_eq!(variant.print(false), "-5");
 
     let variant = to_variant(&6u8).unwrap();
     assert_eq!(variant.type_(), VariantTy::BYTE);
-    assert_eq!(variant.to_string(), "0x06");
+    assert_eq!(variant.print(false), "0x06");
 
     let variant = to_variant(&7u16).unwrap();
     assert_eq!(variant.type_(), VariantTy::UINT16);
-    assert_eq!(variant.to_string(), "7");
+    assert_eq!(variant.print(false), "7");
 
     let variant = to_variant(&8u32).unwrap();
     assert_eq!(variant.type_(), VariantTy::UINT32);
-    assert_eq!(variant.to_string(), "8");
+    assert_eq!(variant.print(false), "8");
 
     let variant = to_variant(&9u64).unwrap();
     assert_eq!(variant.type_(), VariantTy::UINT64);
-    assert_eq!(variant.to_string(), "9");
+    assert_eq!(variant.print(false), "9");
 
     let variant = to_variant(&10.1f64).unwrap();
     assert_eq!(variant.type_(), VariantTy::DOUBLE);
-    assert_eq!(variant.to_string(), "10.1");
+    assert_eq!(variant.print(false), "10.1");
 
     let variant = to_variant(&"123").unwrap();
     assert_eq!(variant.type_(), VariantTy::STRING);
-    assert_eq!(variant.to_string(), "'123'");
+    assert_eq!(variant.print(false), "'123'");
 
     let variant = to_variant(&String::from("124")).unwrap();
     assert_eq!(variant.type_(), VariantTy::STRING);
-    assert_eq!(variant.to_string(), "'124'");
+    assert_eq!(variant.print(false), "'124'");
 
     /*let variant = to_variant(&ObjectPath::new("/com/org/Test").unwrap()).unwrap();
     assert_eq!(variant.type_(), VariantTy::OBJECT_PATH);
-    assert_eq!(variant.to_string(), "'/com/org/Test'");
+    assert_eq!(variant.print(false), "'/com/org/Test'");
 
     let variant = to_variant(&Signature::new("(asgva(in)a{sb})").unwrap()).unwrap();
     assert_eq!(variant.type_(), VariantTy::SIGNATURE);
-    assert_eq!(variant.to_string(), "'(asgva(in)a{sb})'");*/
+    assert_eq!(variant.print(false), "'(asgva(in)a{sb})'");*/
 }
 
 fn to_typed_variant<S: serde::Serialize + StaticVariantType>(value: S) -> Result<glib::Variant, glib_serde::Error> {
@@ -75,19 +75,19 @@ fn to_typed_variant<S: serde::Serialize + StaticVariantType>(value: S) -> Result
 fn serialize_container_types() {
     let variant = to_variant(&Some("Hello")).unwrap();
     assert_eq!(variant.type_().as_str(), "ms");
-    assert_eq!(variant.to_string(), "'Hello'");
+    assert_eq!(variant.print(false), "'Hello'");
 
     let variant = to_typed_variant(&Option::<String>::None).unwrap();
     assert_eq!(variant.type_().as_str(), "ms");
-    assert_eq!(variant.to_string(), "nothing");
+    assert_eq!(variant.print(false), "nothing");
 
     let variant = to_variant(&vec![1i32, 2, 3]).unwrap();
     assert_eq!(variant.type_().as_str(), "ai");
-    assert_eq!(variant.to_string(), "[1, 2, 3]");
+    assert_eq!(variant.print(false), "[1, 2, 3]");
 
     let variant = to_variant(&HashMap::from([(2u64, "World")])).unwrap();
     assert_eq!(variant.type_().as_str(), "a{ts}");
-    assert_eq!(variant.to_string(), "{2: 'World'}");
+    assert_eq!(variant.print(false), "{2: 'World'}");
 
     let dict = VariantDict::new(None);
     dict.insert("a", &200i32);
@@ -96,13 +96,13 @@ fn serialize_container_types() {
     let variant = to_variant(dict.as_serializable()).unwrap();
     assert_eq!(variant.type_(), VariantTy::VARDICT);
     assert_eq!(
-        variant.to_string(),
+        variant.print(false),
         "{'b': <(int64 300, 400.5)>, 'a': <200>, 'c': <(int64 300, 500.5)>}"
     );
 
     let variant = to_typed_variant(&"Hello".to_variant().as_serializable()).unwrap();
     assert_eq!(variant.type_(), VariantTy::VARIANT);
-    assert_eq!(variant.to_string(), "<'Hello'>");
+    assert_eq!(variant.print(false), "<'Hello'>");
 
     /*let variant = to_variant(
         ObjectPath::new("/com/org/Test")
@@ -112,7 +112,7 @@ fn serialize_container_types() {
     )
     .unwrap();
     assert_eq!(variant.type_(), VariantTy::VARIANT);
-    assert_eq!(variant.to_string(), "<objectpath '/com/org/Test'>");
+    assert_eq!(variant.print(false), "<objectpath '/com/org/Test'>");
 
     let variant = to_variant(
         Signature::new("a(is)")
@@ -122,32 +122,32 @@ fn serialize_container_types() {
     )
     .unwrap();
     assert_eq!(variant.type_(), VariantTy::VARIANT);
-    assert_eq!(variant.to_string(), "<signature 'a(is)'>");*/
+    assert_eq!(variant.print(false), "<signature 'a(is)'>");*/
 
     dict.insert("a", &"abc");
     dict.insert("b", &("hello", "world"));
     let variant = to_typed_variant(&dict.to_variant().as_serializable()).unwrap();
     assert_eq!(variant.type_(), VariantTy::VARIANT);
     assert_eq!(
-        variant.to_string(),
+        variant.print(false),
         "<{'b': <('hello', 'world')>, 'a': <'abc'>}>"
     );
 
     let variant = to_typed_variant(Some("Hello").to_variant().as_serializable()).unwrap();
     assert_eq!(variant.type_(), VariantTy::VARIANT);
-    assert_eq!(variant.to_string(), "<@ms 'Hello'>");
+    assert_eq!(variant.print(false), "<@ms 'Hello'>");
 
     /*let variant = to_typed_variant(Option::<String>::None.to_variant().as_serialized()).unwrap();
     assert_eq!(variant.type_(), VariantTy::VARIANT);
-    assert_eq!(variant.to_string(), "<@ms nothing>");*/
+    assert_eq!(variant.print(false), "<@ms nothing>");*/
 
     let variant = to_typed_variant([1u32, 2u32, 3u32].to_variant().as_serializable()).unwrap();
     assert_eq!(variant.type_(), VariantTy::VARIANT);
-    assert_eq!(variant.to_string(), "<[uint32 1, 2, 3]>");
+    assert_eq!(variant.print(false), "<[uint32 1, 2, 3]>");
 
     let variant = to_typed_variant(("Hello", "World").to_variant().as_serializable()).unwrap();
     assert_eq!(variant.type_(), VariantTy::VARIANT);
-    assert_eq!(variant.to_string(), "<('Hello', 'World')>");
+    assert_eq!(variant.print(false), "<('Hello', 'World')>");
 
     let variant = to_typed_variant(
         HashMap::from([(1i64, "Hello")])
@@ -156,7 +156,7 @@ fn serialize_container_types() {
     )
     .unwrap();
     assert_eq!(variant.type_().as_str(), VariantTy::VARIANT);
-    assert_eq!(variant.to_string(), "<{int64 1: 'Hello'}>");
+    assert_eq!(variant.print(false), "<{int64 1: 'Hello'}>");
 }
 
 #[test]
