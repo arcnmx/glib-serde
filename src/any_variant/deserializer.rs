@@ -578,7 +578,7 @@ impl<'v, 'de, V: FixedSizeVariantType + IntoDeserializer<'de, Error>> de::SeqAcc
     }
 
     fn size_hint(&self) -> Option<usize> {
-        Some(self.input.len() - self.index - 1)
+        Some(self.input.len() - self.index)
     }
 }
 
@@ -646,7 +646,7 @@ impl<'v, 'de> de::SeqAccess<'de> for ContainerDeserializer<'v> {
     }
 
     fn size_hint(&self) -> Option<usize> {
-        Some(self.de.variant.n_children() - self.index - 1)
+        Some(self.de.variant.n_children() - self.index)
     }
 }
 
